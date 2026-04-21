@@ -1,740 +1,156 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8"/>
 <title>Mapped C&L</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
 <style>
-  :root {
-    --night: #0d0f14;
-    --deep: #141820;
-    --panel: #1a1e28;
-    --border: #2a2e3e;
-    --gold: #d4a853;
-    --gold-dim: #8a6a2a;
-    --gold-glow: rgba(212,168,83,0.15);
-    --cream: #f0e8d8;
-    --muted: #7a8090;
-    --rust: #c4573a;
-    --sky: #4a8ab0;
-    --sage: #5a8a6a;
-    --violet: #7a5a9a;
-  }
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:'Jost',sans-serif; background:var(--night); color:var(--cream); height:100vh; overflow:hidden; }
-
-  /* HEADER */
-  header {
-    position:fixed; top:0; left:0; right:0; height:58px;
-    background:rgba(13,15,20,0.97); backdrop-filter:blur(12px);
-    border-bottom:1px solid var(--border);
-    display:flex; align-items:center; justify-content:space-between;
-    padding:0 24px; z-index:1000;
-  }
-  .wordmark { display:flex; align-items:baseline; gap:8px; }
-  .wm-main {
-    font-family:'Cormorant Garamond',serif; font-size:1.65rem; font-weight:700;
-    color:var(--cream); letter-spacing:0.06em;
-  }
-  .wm-main span { color:var(--gold); }
-  .wm-sub {
-    font-family:'Cormorant Garamond',serif; font-size:0.85rem;
-    font-style:italic; color:var(--muted); letter-spacing:0.1em;
-  }
-  .header-center { display:flex; gap:16px; }
-  .stat-pill {
-    display:flex; align-items:center; gap:7px;
-    background:var(--panel); border:1px solid var(--border);
-    border-radius:20px; padding:5px 14px; font-size:0.77rem; color:var(--muted);
-  }
-  .stat-pill strong { color:var(--gold); font-size:0.95rem; font-family:'Cormorant Garamond',serif; }
-  .header-right { display:flex; gap:10px; align-items:center; }
-  .hdr-btn {
-    padding:7px 16px; border-radius:6px; font-family:'Jost',sans-serif;
-    font-size:0.8rem; font-weight:500; cursor:pointer;
-    border:1px solid var(--border); transition:all 0.2s; letter-spacing:0.04em;
-  }
-  .hdr-btn.ghost { background:transparent; color:var(--muted); }
-  .hdr-btn.ghost:hover { border-color:var(--gold); color:var(--gold); }
-  .hdr-btn.gold { background:var(--gold); color:var(--night); border-color:var(--gold); font-weight:600; }
-  .hdr-btn.gold:hover { background:#e0b860; }
-
-  /* SAVE STATUS */
-  .save-status {
-    font-size:0.72rem; color:var(--muted); display:flex;
-    align-items:center; gap:6px; opacity:0; transition:opacity 0.4s;
-  }
-  .save-status.show { opacity:1; }
-  .save-dot { width:7px; height:7px; border-radius:50%; background:var(--muted); }
-  .save-dot.saving { background:var(--gold); animation:pulse 1s infinite; }
-  .save-dot.saved { background:var(--sage); }
-  .save-dot.error { background:var(--rust); }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-
-  /* MAP */
-  #map { position:fixed; top:58px; left:320px; right:0; bottom:0; z-index:1; }
-  .leaflet-tile-pane { filter:saturate(0.65) brightness(0.82) hue-rotate(8deg); }
-
-  /* SIDEBAR */
-  .sidebar {
-    position:fixed; top:58px; left:0; bottom:0; width:320px;
-    background:var(--panel); border-right:1px solid var(--border);
-    display:flex; flex-direction:column; z-index:500;
-  }
-  .sidebar-filters { padding:14px 16px 10px; border-bottom:1px solid var(--border); }
-  .filter-label { font-size:0.65rem; font-weight:600; letter-spacing:0.15em; text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
-  .chips { display:flex; gap:6px; flex-wrap:wrap; }
-  .chip {
-    padding:4px 11px; border-radius:20px; font-size:0.72rem; font-weight:500;
-    border:1px solid var(--border); cursor:pointer; color:var(--muted);
-    background:transparent; transition:all 0.18s; font-family:'Jost',sans-serif;
-  }
-  .chip:hover { border-color:var(--gold-dim); color:var(--cream); }
-  .chip.active { color:var(--night) !important; border-color:transparent !important; }
-  .chip.active.all { background:var(--cream); }
-  .chip.active.restaurant { background:var(--rust); }
-  .chip.active.travel { background:var(--sky); }
-  .chip.active.activity { background:var(--sage); }
-  .chip.active.gem { background:var(--gold); }
-  .chip.active.friends { background:var(--violet); color:white !important; }
-
-  .places-scroll { flex:1; overflow-y:auto; padding:10px 12px; }
-  .places-scroll::-webkit-scrollbar { width:3px; }
-  .places-scroll::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
-
-  .section-head {
-    font-size:0.62rem; font-weight:600; letter-spacing:0.18em;
-    text-transform:uppercase; color:var(--gold-dim); padding:12px 6px 6px;
-  }
-  .place-row {
-    display:flex; align-items:center; gap:10px; padding:10px;
-    border-radius:8px; cursor:pointer; transition:background 0.15s;
-    margin-bottom:3px; border:1px solid transparent;
-  }
-  .place-row:hover { background:rgba(255,255,255,0.04); }
-  .place-row.active { background:var(--gold-glow); border-color:var(--gold-dim); }
-  .row-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
-  .row-dot.restaurant { background:var(--rust); }
-  .row-dot.travel { background:var(--sky); }
-  .row-dot.activity { background:var(--sage); }
-  .row-dot.gem { background:var(--gold); }
-  .row-dot.friends { background:var(--violet); }
-  .row-info { flex:1; min-width:0; }
-  .row-name { font-family:'Cormorant Garamond',serif; font-size:0.97rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .row-sub { font-size:0.7rem; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .row-stars { font-size:0.65rem; color:var(--gold); flex-shrink:0; }
-
-  .empty-msg { text-align:center; padding:48px 20px; color:var(--muted); }
-  .empty-msg .e-icon { font-size:2.2rem; margin-bottom:12px; opacity:0.4; }
-  .empty-msg p { font-size:0.82rem; line-height:1.6; }
-
-  /* LOADING SCREEN */
-  .loading-screen {
-    position:fixed; inset:0; background:var(--night);
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    z-index:9999; transition:opacity 0.5s;
-  }
-  .loading-screen.fade { opacity:0; pointer-events:none; }
-  .loading-title { font-family:'Cormorant Garamond',serif; font-size:2.5rem; color:var(--gold); margin-bottom:12px; letter-spacing:0.1em; }
-  .loading-sub { font-size:0.82rem; color:var(--muted); margin-bottom:28px; }
-  .loading-bar { width:180px; height:2px; background:var(--border); border-radius:2px; overflow:hidden; }
-  .loading-bar-fill { height:100%; background:var(--gold); border-radius:2px; animation:load 1.4s ease forwards; }
-  @keyframes load { from{width:0} to{width:100%} }
-
-  /* PLACING BANNER */
-  .placing-banner {
-    position:fixed; bottom:32px; left:50%; transform:translateX(-50%) translateY(80px);
-    background:var(--gold); color:var(--night); padding:12px 28px; border-radius:30px;
-    font-weight:600; font-size:0.88rem; letter-spacing:0.04em;
-    box-shadow:0 8px 32px rgba(212,168,83,0.4); z-index:2000;
-    transition:transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
-    white-space:nowrap; display:flex; align-items:center; gap:10px;
-  }
-  .placing-banner.show { transform:translateX(-50%) translateY(0); }
-  .cancel-x {
-    background:rgba(0,0,0,0.15); border:none; border-radius:50%;
-    width:22px; height:22px; cursor:pointer; font-size:0.9rem;
-    display:flex; align-items:center; justify-content:center;
-    color:var(--night); font-weight:700; line-height:1;
-  }
-
-  /* DETAIL PANEL */
-  .detail-panel {
-    position:fixed; right:24px; bottom:32px; width:300px;
-    background:var(--panel); border:1px solid var(--border); border-radius:14px;
-    padding:22px; z-index:1500;
-    transform:translateY(20px); opacity:0; pointer-events:none;
-    transition:all 0.3s cubic-bezier(0.34,1.2,0.64,1);
-    box-shadow:0 16px 50px rgba(0,0,0,0.5);
-  }
-  .detail-panel.show { opacity:1; transform:translateY(0); pointer-events:all; }
-  .dp-close { position:absolute; top:12px; right:14px; background:none; border:none; color:var(--muted); font-size:1rem; cursor:pointer; transition:color 0.2s; }
-  .dp-close:hover { color:var(--cream); }
-  .dp-tag { font-size:0.62rem; font-weight:600; letter-spacing:0.15em; text-transform:uppercase; margin-bottom:6px; }
-  .dp-tag.restaurant { color:var(--rust); }
-  .dp-tag.travel { color:var(--sky); }
-  .dp-tag.activity { color:var(--sage); }
-  .dp-tag.gem { color:var(--gold); }
-  .dp-tag.friends { color:var(--violet); }
-  .dp-name { font-family:'Cormorant Garamond',serif; font-size:1.45rem; font-weight:600; line-height:1.2; margin-bottom:4px; }
-  .dp-address { font-size:0.75rem; color:var(--muted); margin-bottom:10px; line-height:1.4; }
-  .dp-stars { color:var(--gold); font-size:0.9rem; margin-bottom:10px; letter-spacing:2px; }
-  .dp-note { font-size:0.82rem; line-height:1.55; color:rgba(240,232,216,0.75); font-style:italic; border-left:2px solid var(--gold-dim); padding-left:10px; margin-bottom:14px; }
-  .dp-who { font-size:0.72rem; color:var(--muted); margin-bottom:14px; }
-  .dp-actions { display:flex; gap:8px; }
-  .dp-gmaps {
-    flex:1; display:flex; align-items:center; justify-content:center; gap:6px;
-    background:transparent; border:1px solid var(--border); color:var(--sky);
-    padding:8px 14px; border-radius:6px; font-family:'Jost',sans-serif;
-    font-size:0.78rem; font-weight:500; cursor:pointer; text-decoration:none;
-    transition:all 0.2s;
-  }
-  .dp-gmaps:hover { border-color:var(--sky); background:rgba(74,138,176,0.1); }
-  .dp-delete {
-    background:transparent; border:1px solid var(--border); color:var(--muted);
-    padding:8px 12px; border-radius:6px; font-family:'Jost',sans-serif;
-    font-size:0.78rem; cursor:pointer; transition:all 0.2s;
-  }
-  .dp-delete:hover { border-color:var(--rust); color:var(--rust); }
-
-  /* MODAL */
-  .overlay {
-    position:fixed; inset:0; background:rgba(0,0,0,0.78);
-    backdrop-filter:blur(4px); z-index:3000;
-    display:flex; align-items:center; justify-content:center;
-    opacity:0; pointer-events:none; transition:opacity 0.25s;
-  }
-  .overlay.open { opacity:1; pointer-events:all; }
-  .modal {
-    background:var(--panel); border:1px solid var(--border); border-radius:16px;
-    padding:32px; width:460px; max-width:95vw; max-height:90vh;
-    overflow-y:auto; transform:scale(0.96); transition:transform 0.25s;
-    box-shadow:0 24px 80px rgba(0,0,0,0.6);
-  }
-  .overlay.open .modal { transform:scale(1); }
-  .modal::-webkit-scrollbar { width:3px; }
-  .modal::-webkit-scrollbar-thumb { background:var(--border); }
-  .modal h2 { font-family:'Cormorant Garamond',serif; font-size:1.6rem; font-weight:600; margin-bottom:4px; }
-  .modal-sub { font-size:0.8rem; color:var(--muted); margin-bottom:24px; }
-  .form-group { margin-bottom:16px; }
-  label { display:block; font-size:0.68rem; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted); margin-bottom:6px; }
-  input[type="text"], textarea {
-    width:100%; padding:10px 13px; background:var(--deep);
-    border:1px solid var(--border); border-radius:7px; color:var(--cream);
-    font-family:'Jost',sans-serif; font-size:0.88rem; outline:none; transition:border-color 0.2s;
-  }
-  input:focus, textarea:focus { border-color:var(--gold-dim); }
-  textarea { resize:vertical; min-height:65px; }
-  .type-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-  .type-card {
-    padding:10px 12px; border:1px solid var(--border); border-radius:8px;
-    background:var(--deep); cursor:pointer; transition:all 0.18s;
-    display:flex; align-items:center; gap:8px; font-size:0.83rem;
-    color:var(--muted); font-family:'Jost',sans-serif;
-  }
-  .type-card:hover { border-color:var(--gold-dim); color:var(--cream); }
-  .type-card.sel.restaurant { border-color:var(--rust); color:var(--rust); background:rgba(196,87,58,0.1); }
-  .type-card.sel.travel { border-color:var(--sky); color:var(--sky); background:rgba(74,138,176,0.1); }
-  .type-card.sel.activity { border-color:var(--sage); color:var(--sage); background:rgba(90,138,106,0.1); }
-  .type-card.sel.gem { border-color:var(--gold); color:var(--gold); background:rgba(212,168,83,0.1); }
-  .star-row { display:flex; gap:8px; }
-  .star-b { font-size:1.5rem; background:none; border:none; color:var(--border); cursor:pointer; transition:all 0.12s; padding:0; line-height:1; }
-  .star-b.on { color:var(--gold); }
-  .star-b:hover { transform:scale(1.2); }
-  .who-row { display:flex; gap:8px; }
-  .who-card {
-    flex:1; padding:10px; border:1px solid var(--border); border-radius:8px;
-    background:var(--deep); cursor:pointer; text-align:center; font-size:0.82rem;
-    color:var(--muted); transition:all 0.18s; font-family:'Jost',sans-serif;
-  }
-  .who-card:hover { border-color:var(--gold-dim); color:var(--cream); }
-  .who-card.sel { border-color:var(--gold); color:var(--gold); background:var(--gold-glow); }
-  .modal-foot { display:flex; gap:10px; margin-top:24px; }
-  .btn-main {
-    flex:1; padding:13px; background:var(--gold); color:var(--night);
-    border:none; border-radius:8px; font-family:'Jost',sans-serif;
-    font-size:0.9rem; font-weight:600; cursor:pointer; transition:background 0.2s;
-  }
-  .btn-main:hover { background:#e0b860; }
-  .btn-ghost {
-    padding:13px 20px; background:transparent; color:var(--muted);
-    border:1px solid var(--border); border-radius:8px; font-family:'Jost',sans-serif;
-    font-size:0.9rem; cursor:pointer; transition:all 0.2s;
-  }
-  .btn-ghost:hover { border-color:var(--cream); color:var(--cream); }
-
-  /* INVITE */
-  .invite-code {
-    background:var(--deep); border:1px solid var(--gold-dim); border-radius:10px;
-    text-align:center; padding:20px; font-family:'Cormorant Garamond',serif;
-    font-size:2.2rem; color:var(--gold); letter-spacing:0.2em; margin:16px 0;
-  }
-
-  /* CUSTOM PIN */
-  .lc-pin { display:flex; flex-direction:column; align-items:center; cursor:pointer; }
-  .lc-pin-head {
-    width:28px; height:28px; border-radius:50% 50% 50% 0; transform:rotate(-45deg);
-    border:2px solid rgba(255,255,255,0.5); display:flex; align-items:center;
-    justify-content:center; box-shadow:0 3px 12px rgba(0,0,0,0.5);
-  }
-  .lc-pin-icon { transform:rotate(45deg); font-size:12px; }
-  .lc-pin-tail { width:2px; height:8px; background:rgba(255,255,255,0.25); margin-top:1px; }
-  .leaflet-container.placing { cursor:crosshair !important; }
-
-  /* MAP LEGEND */
-  .map-legend {
-    position:fixed; bottom:32px; left:340px;
-    background:rgba(26,30,40,0.92); backdrop-filter:blur(8px);
-    border:1px solid var(--border); border-radius:10px;
-    padding:10px 14px; z-index:400; font-size:0.72rem;
-  }
-  .leg-title { font-size:0.6rem; font-weight:600; letter-spacing:0.15em; text-transform:uppercase; color:var(--muted); margin-bottom:7px; }
-  .leg-row { display:flex; align-items:center; gap:7px; color:rgba(240,232,216,0.6); margin-bottom:4px; }
-  .leg-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+body { margin:0; font-family:sans-serif; }
+#map { position:absolute; top:60px; bottom:0; left:250px; right:0; }
+.sidebar { position:absolute; top:60px; left:0; bottom:0; width:250px; overflow:auto; background:#f5f5f5; padding:10px; }
+.place { padding:8px; border-bottom:1px solid #ddd; cursor:pointer; }
 </style>
 </head>
+
 <body>
 
-<!-- LOADING -->
-<div class="loading-screen" id="loadingScreen">
-  <div class="loading-title">Mapped C&L</div>
-  <div class="loading-sub">Loading your world…</div>
-  <div class="loading-bar"><div class="loading-bar-fill"></div></div>
+<div style="height:60px;background:#333;color:white;padding:15px;">
+Mapped C&L
+<button onclick="startPlacing()">Add Pin</button>
 </div>
 
-<!-- HEADER -->
-<header>
-  <div class="wordmark">
-    <span class="wm-main">Mapped <span>C&L</span></span>
-    <span class="wm-sub">our places</span>
-  </div>
-  <div class="header-center">
-    <div class="stat-pill">🌍 <strong id="statTotal">0</strong> places</div>
-    <div class="stat-pill">💑 <strong id="statOurs">0</strong> ours</div>
-    <div class="stat-pill">👥 <strong id="statFriends">0</strong> friends</div>
-  </div>
-  <div class="header-right">
-    <div class="save-status" id="saveStatus">
-      <div class="save-dot" id="saveDot"></div>
-      <span id="saveText">Saved</span>
-    </div>
-    <button class="hdr-btn ghost" onclick="openInvite()">🔗 Invite</button>
-    <button class="hdr-btn gold" onclick="startPlacing()">＋ Pin a Place</button>
-  </div>
-</header>
-
-<!-- SIDEBAR -->
 <div class="sidebar">
-  <div class="sidebar-filters">
-    <div class="filter-label">Filter</div>
-    <div class="chips">
-      <button class="chip all active" onclick="setFilter('all',this)">All</button>
-      <button class="chip restaurant" onclick="setFilter('restaurant',this)">🍽 Food</button>
-      <button class="chip travel" onclick="setFilter('travel',this)">✈ Travel</button>
-      <button class="chip activity" onclick="setFilter('activity',this)">🎯 Activity</button>
-      <button class="chip gem" onclick="setFilter('gem',this)">💎 Gem</button>
-      <button class="chip friends" onclick="setFilter('friends',this)">👥 Friends</button>
-    </div>
-  </div>
-  <div class="places-scroll" id="placesList"></div>
+<input id="search" placeholder="Search..." oninput="render()"/>
+<div id="list"></div>
 </div>
 
-<!-- MAP -->
 <div id="map"></div>
 
-<!-- LEGEND -->
-<div class="map-legend">
-  <div class="leg-title">Legend</div>
-  <div class="leg-row"><div class="leg-dot" style="background:var(--rust)"></div> Restaurant</div>
-  <div class="leg-row"><div class="leg-dot" style="background:var(--sky)"></div> Travel</div>
-  <div class="leg-row"><div class="leg-dot" style="background:var(--sage)"></div> Activity</div>
-  <div class="leg-row"><div class="leg-dot" style="background:var(--gold)"></div> Hidden Gem</div>
-  <div class="leg-row"><div class="leg-dot" style="background:var(--violet)"></div> Friend Pick</div>
-</div>
-
-<!-- PLACING BANNER -->
-<div class="placing-banner" id="placingBanner">
-  📍 Click the map to drop your pin
-  <button class="cancel-x" onclick="cancelPlacing()">✕</button>
-</div>
-
-<!-- DETAIL PANEL -->
-<div class="detail-panel" id="detailPanel">
-  <button class="dp-close" onclick="closeDetail()">✕</button>
-  <div class="dp-tag" id="dpTag"></div>
-  <div class="dp-name" id="dpName"></div>
-  <div class="dp-address" id="dpAddress"></div>
-  <div class="dp-stars" id="dpStars"></div>
-  <div class="dp-note" id="dpNote"></div>
-  <div class="dp-who" id="dpWho"></div>
-  <div class="dp-actions">
-    <a class="dp-gmaps" id="dpMapsLink" target="_blank" rel="noopener">🗺 Google Maps</a>
-    <button class="dp-delete" onclick="deleteActive()">🗑</button>
-  </div>
-</div>
-
-<!-- ADD MODAL -->
-<div class="overlay" id="addOverlay">
-  <div class="modal">
-    <h2>Pin a Place</h2>
-    <p class="modal-sub" id="modalHint">Pinned at your chosen spot.</p>
-    <div class="form-group">
-      <label>Name of Place</label>
-      <input type="text" id="iName" placeholder="e.g. Café de Flore, Amalfi Coast…">
-    </div>
-    <div class="form-group">
-      <label>Address</label>
-      <input type="text" id="iAddress" placeholder="e.g. 172 Bd Saint-Germain, Paris, France">
-    </div>
-    <div class="form-group">
-      <label>Type</label>
-      <div class="type-grid">
-        <button class="type-card restaurant" onclick="selType('restaurant',this)">🍽 Restaurant</button>
-        <button class="type-card travel" onclick="selType('travel',this)">✈ Travel</button>
-        <button class="type-card activity" onclick="selType('activity',this)">🎯 Activity</button>
-        <button class="type-card gem" onclick="selType('gem',this)">💎 Hidden Gem</button>
-      </div>
-    </div>
-    <div class="form-group">
-      <label>Rating</label>
-      <div class="star-row">
-        <button class="star-b" onclick="setStars(1)">★</button>
-        <button class="star-b" onclick="setStars(2)">★</button>
-        <button class="star-b" onclick="setStars(3)">★</button>
-        <button class="star-b" onclick="setStars(4)">★</button>
-        <button class="star-b" onclick="setStars(5)">★</button>
-      </div>
-    </div>
-    <div class="form-group">
-      <label>Memory / Note</label>
-      <textarea id="iNote" placeholder="What made it special?"></textarea>
-    </div>
-    <div class="form-group">
-      <label>Added by</label>
-      <div class="who-row">
-        <button class="who-card sel" onclick="selWho('us',this)">💑 Charlotte & Lucas</button>
-        <button class="who-card" onclick="selWho('friend',this)">👥 Friend / Family</button>
-      </div>
-    </div>
-    <div class="form-group" id="friendNameGroup" style="display:none">
-      <label>Their Name</label>
-      <input type="text" id="iFriendName" placeholder="e.g. Marco, Aunt Lisa…">
-    </div>
-    <div class="modal-foot">
-      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
-      <button class="btn-main" onclick="submitPin()">Drop Pin ✦</button>
-    </div>
-  </div>
-</div>
-
-<!-- INVITE MODAL -->
-<div class="overlay" id="inviteOverlay">
-  <div class="modal">
-    <h2>Invite Friends & Family</h2>
-    <p class="modal-sub">Share this code so they can add their own spots to your map.</p>
-    <div class="invite-code">LC-7842</div>
-    <p style="font-size:0.8rem;color:var(--muted);text-align:center;line-height:1.6;margin-bottom:8px">
-      Anyone with this code can add Friend picks.<br>
-      Charlotte & Lucas's pins are always yours alone.
-    </p>
-    <div class="modal-foot">
-      <button class="btn-ghost" onclick="closeInvite()">Close</button>
-    </div>
-  </div>
-</div>
-
 <script>
-// ─── Config ──────────────────────────────────────────────
-const BIN_ID  = '69e6b4d2aaba8821971dd7c2';
-const API_KEY = '$2a$10$Ch8pkf90p5Kv1x5eeXSQ8uy6sVw5KJcgd8oNRZsMKBdMIWX4AJfhq';
-const BIN_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
-const HEADERS = { 'Content-Type':'application/json', 'X-Master-Key': API_KEY };
-
-// ─── State ───────────────────────────────────────────────
-const TYPE_COLORS = { restaurant:'#c4573a', travel:'#4a8ab0', activity:'#5a8a6a', gem:'#d4a853', friends:'#7a5a9a' };
-const TYPE_ICONS  = { restaurant:'🍽', travel:'✈', activity:'🎯', gem:'💎', friends:'📍' };
-const TYPE_LABELS = { restaurant:'Restaurant', travel:'Travel', activity:'Activity', gem:'Hidden Gem', friends:'Friend Pick' };
+const STORAGE_KEY = 'mapped_places';
 
 let places = [];
-let currentFilter = 'all';
+let map;
 let placing = false;
 let pendingLatLng = null;
-let selType_ = null;
-let selStars = 0;
-let selWho_ = 'us';
-let activeId = null;
+
+// ================= INIT =================
+window.onload = () => {
+map = L.map('map').setView([30,0],2);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+map.on('click', e=>{
+if(!placing) return;
+pendingLatLng = e.latlng;
+placing=false;
+openForm();
+});
+
+loadPlaces();
+};
+
+// ================= STORAGE =================
+function loadPlaces(){
+const raw = localStorage.getItem(STORAGE_KEY);
+places = raw ? JSON.parse(raw) : [];
+render();
+}
+
+function savePlaces(){
+localStorage.setItem(STORAGE_KEY, JSON.stringify(places));
+}
+
+// ================= UI =================
+function render(){
+renderList();
+renderMarkers();
+}
+
+function renderList(){
+const q = document.getElementById("search").value.toLowerCase();
+const list = document.getElementById("list");
+list.innerHTML="";
+
+places
+.filter(p=>p.name.toLowerCase().includes(q))
+.forEach(p=>{
+const div = document.createElement("div");
+div.className="place";
+div.innerHTML = `<strong>${p.name}</strong><br>${p.address||""}`;
+div.onclick = ()=>showDetail(p.id);
+list.appendChild(div);
+});
+}
+
 let markers = {};
 
-// ─── JSONBin ─────────────────────────────────────────────
-function showSaveStatus(state, text) {
-  const s = document.getElementById('saveStatus');
-  const d = document.getElementById('saveDot');
-  const t = document.getElementById('saveText');
-  d.className = 'save-dot ' + state;
-  t.textContent = text;
-  s.classList.add('show');
-  if (state === 'saved' || state === 'error') {
-    setTimeout(() => s.classList.remove('show'), 3000);
-  }
+function renderMarkers(){
+Object.values(markers).forEach(m=>map.removeLayer(m));
+markers={};
+
+places.forEach(p=>{
+const m = L.marker([p.lat,p.lng]).addTo(map);
+m.on("click",()=>showDetail(p.id));
+markers[p.id]=m;
+});
 }
 
-async function loadPlaces() {
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-    const r = await fetch(BIN_URL + '/latest', {
-      headers: { 'X-Master-Key': API_KEY },
-      signal: controller.signal
-    });
-    clearTimeout(timeout);
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const data = await r.json();
-    places = Array.isArray(data.record) ? data.record : [];
-  } catch(e) {
-    console.warn('JSONBin load failed (likely running locally — will work fine on GitHub Pages):', e.message);
-    places = [];
-    // Show a gentle offline notice instead of getting stuck
-    const sub = document.querySelector('.loading-sub');
-    if (sub) sub.textContent = 'Running locally — sync works on GitHub Pages.';
-  }
-  hideLanding();
-  render();
+// ================= ADD =================
+function startPlacing(){
+placing=true;
 }
 
-async function savePlaces() {
-  showSaveStatus('saving', 'Saving…');
-  try {
-    await fetch(BIN_URL, {
-      method: 'PUT',
-      headers: HEADERS,
-      body: JSON.stringify(places)
-    });
-    showSaveStatus('saved', 'Saved ✓');
-  } catch(e) {
-    showSaveStatus('error', 'Save failed');
-    console.error('Save failed', e);
-  }
+function openForm(edit=null){
+const name = prompt("Name:");
+if(!name) return;
+
+const address = prompt("Address:");
+const website = prompt("Website:");
+const note = prompt("Note:");
+
+if(edit){
+edit.name=name;
+edit.address=address;
+edit.website=website;
+edit.note=note;
+}else{
+places.push({
+id:Date.now(),
+name,address,website,note,
+lat:pendingLatLng.lat,
+lng:pendingLatLng.lng
+});
 }
 
-function hideLanding() {
-  const ls = document.getElementById('loadingScreen');
-  ls.classList.add('fade');
-  setTimeout(() => ls.style.display = 'none', 600);
+savePlaces();
+render();
 }
 
-// ─── Map (initialised in window.load below) ──────────────
-let map;
+// ================= DETAIL =================
+function showDetail(id){
+const p = places.find(x=>x.id===id);
 
-function makeIcon(type, who) {
-  const cls = who === 'friend' ? 'friends' : type;
-  const color = TYPE_COLORS[cls] || '#d4a853';
-  const icon  = TYPE_ICONS[cls]  || '📍';
-  const html  = `<div class="lc-pin">
-    <div class="lc-pin-head" style="background:${color}">
-      <span class="lc-pin-icon">${icon}</span>
-    </div>
-    <div class="lc-pin-tail"></div>
-  </div>`;
-  return L.divIcon({ html, className:'', iconSize:[28,42], iconAnchor:[14,42] });
+const link = p.website
+? `Website: ${p.website}`
+: `Maps: https://maps.google.com?q=${p.lat},${p.lng}`;
+
+const action = confirm(`${p.name}\n\n${p.note||""}\n\n${link}\n\nOK=Edit, Cancel=Delete`);
+
+if(action){
+openForm(p);
+}else{
+if(confirm("Delete?")){
+places = places.filter(x=>x.id!==id);
+savePlaces();
+render();
 }
-
-function refreshMarkers() {
-  Object.values(markers).forEach(m => map.removeLayer(m));
-  markers = {};
-  getFiltered().forEach(p => {
-    const m = L.marker([p.lat, p.lng], { icon: makeIcon(p.type, p.who) }).addTo(map);
-    m.on('click', () => showDetail(p.id));
-    markers[p.id] = m;
-  });
 }
-
-// ─── Filter & render ─────────────────────────────────────
-function getFiltered() {
-  if (currentFilter === 'all') return places;
-  if (currentFilter === 'friends') return places.filter(p => p.who === 'friend');
-  return places.filter(p => p.type === currentFilter);
 }
+</script>
 
-function renderSidebar() {
-  const list = document.getElementById('placesList');
-  const filtered = getFiltered();
-  if (!filtered.length) {
-    list.innerHTML = `<div class="empty-msg"><div class="e-icon">🗺</div><p>No places here yet.<br>Start pinning your adventures!</p></div>`;
-    return;
-  }
-  const ours    = filtered.filter(p => p.who === 'us');
-  const friends = filtered.filter(p => p.who === 'friend');
-  const row = p => {
-    const cls = p.who === 'friend' ? 'friends' : p.type;
-    return `<div class="place-row ${activeId===p.id?'active':''}" onclick="showDetail('${p.id}')">
-      <div class="row-dot ${cls}"></div>
-      <div class="row-info">
-        <div class="row-name">${p.name}</div>
-        <div class="row-sub">${p.address||''}</div>
-      </div>
-      <div class="row-stars">${'★'.repeat(p.rating)}</div>
-    </div>`;
-  };
-  let html = '';
-  if (ours.length)    html += `<div class="section-head">Charlotte & Lucas</div>` + ours.map(row).join('');
-  if (friends.length) html += `<div class="section-head">Friends & Family</div>`  + friends.map(row).join('');
-  list.innerHTML = html;
-}
-
-function updateStats() {
-  document.getElementById('statTotal').textContent   = places.length;
-  document.getElementById('statOurs').textContent    = places.filter(p=>p.who==='us').length;
-  document.getElementById('statFriends').textContent = places.filter(p=>p.who==='friend').length;
-}
-
-function render() { renderSidebar(); refreshMarkers(); updateStats(); }
-
-function setFilter(f, el) {
-  currentFilter = f;
-  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-  el.classList.add('active');
-  render();
-}
-
-// ─── Detail ──────────────────────────────────────────────
-function showDetail(id) {
-  activeId = id;
-  const p = places.find(x => x.id == id);
-  if (!p) return;
-  const cls = p.who === 'friend' ? 'friends' : p.type;
-  document.getElementById('dpTag').className = `dp-tag ${cls}`;
-  document.getElementById('dpTag').textContent = p.who === 'friend' ? 'Friend Pick' : TYPE_LABELS[p.type];
-  document.getElementById('dpName').textContent    = p.name;
-  document.getElementById('dpAddress').textContent = '📍 ' + (p.address || 'No address saved');
-  document.getElementById('dpStars').textContent   = '★'.repeat(p.rating) + '☆'.repeat(5-p.rating);
-  document.getElementById('dpNote').textContent    = p.note || 'No notes yet.';
-  document.getElementById('dpWho').textContent     = p.who === 'friend' ? `Recommended by ${p.added}` : '♥ Charlotte & Lucas';
-  const q = encodeURIComponent(p.address || `${p.lat},${p.lng}`);
-  document.getElementById('dpMapsLink').href = `https://www.google.com/maps/search/?api=1&query=${q}`;
-  document.getElementById('detailPanel').classList.add('show');
-  map.flyTo([p.lat, p.lng], Math.max(map.getZoom(), 10), { duration:1.2 });
-  renderSidebar();
-}
-
-function closeDetail() {
-  activeId = null;
-  document.getElementById('detailPanel').classList.remove('show');
-  renderSidebar();
-}
-
-async function deleteActive() {
-  if (!activeId) return;
-  if (!confirm('Remove this pin?')) return;
-  places = places.filter(p => p.id != activeId);
-  closeDetail();
-  render();
-  await savePlaces();
-}
-
-// ─── Placing mode ────────────────────────────────────────
-function startPlacing() {
-  placing = true;
-  document.getElementById('placingBanner').classList.add('show');
-  document.getElementById('map').classList.add('placing');
-  closeDetail();
-}
-
-function cancelPlacing(resetFlag = true) {
-  if (resetFlag) { placing = false; pendingLatLng = null; }
-  document.getElementById('placingBanner').classList.remove('show');
-  document.getElementById('map').classList.remove('placing');
-}
-
-// ─── Modal ───────────────────────────────────────────────
-function openModal() {
-  selType_ = null; selStars = 0; selWho_ = 'us';
-  ['iName','iAddress','iNote','iFriendName'].forEach(id => document.getElementById(id).value = '');
-  document.querySelectorAll('.type-card').forEach(b => b.classList.remove('sel'));
-  document.querySelectorAll('.star-b').forEach(b => b.classList.remove('on'));
-  document.querySelectorAll('.who-card').forEach(b => b.classList.remove('sel'));
-  document.querySelector('.who-card').classList.add('sel');
-  document.getElementById('friendNameGroup').style.display = 'none';
-  document.getElementById('addOverlay').classList.add('open');
-}
-
-function closeModal() {
-  document.getElementById('addOverlay').classList.remove('open');
-  pendingLatLng = null; placing = false;
-}
-
-function selType(t, el) {
-  selType_ = t;
-  document.querySelectorAll('.type-card').forEach(b => b.classList.remove('sel'));
-  el.classList.add('sel');
-}
-
-function setStars(n) {
-  selStars = n;
-  document.querySelectorAll('.star-b').forEach((b,i) => b.classList.toggle('on', i < n));
-}
-
-function selWho(w, el) {
-  selWho_ = w;
-  document.querySelectorAll('.who-card').forEach(b => b.classList.remove('sel'));
-  el.classList.add('sel');
-  document.getElementById('friendNameGroup').style.display = w === 'friend' ? 'block' : 'none';
-}
-
-async function submitPin() {
-  const name    = document.getElementById('iName').value.trim();
-  const address = document.getElementById('iAddress').value.trim();
-  const note    = document.getElementById('iNote').value.trim();
-  const friend  = document.getElementById('iFriendName').value.trim();
-  if (!name || !selType_ || !selStars || !pendingLatLng) {
-    alert('Please fill in the name, choose a type, set a rating, and make sure you clicked the map first!');
-    return;
-  }
-  const p = {
-    id: Date.now(),
-    name, address, note,
-    type: selType_,
-    rating: selStars,
-    who: selWho_,
-    added: selWho_ === 'friend' ? (friend || 'Friend') : 'Charlotte & Lucas',
-    lat: pendingLatLng.lat,
-    lng: pendingLatLng.lng,
-  };
-  places.unshift(p);
-  closeModal();
-  render();
-  await savePlaces();
-  setTimeout(() => showDetail(p.id), 200);
-}
-
-// ─── Invite ──────────────────────────────────────────────
-function openInvite()  { document.getElementById('inviteOverlay').classList.add('open'); }
-function closeInvite() { document.getElementById('inviteOverlay').classList.remove('open'); }
-
-// ─── Overlay click to close ──────────────────────────────
-document.getElementById('addOverlay').addEventListener('click', e => { if (e.target===e.currentTarget) closeModal(); });
-document.getElementById('inviteOverlay').addEventListener('click', e => { if (e.target===e.currentTarget) closeInvite(); });
-
-// ─── Boot ────────────────────────────────────────────────
-window.addEventListener('load', () => {
-  map = L.map('map', { zoomControl:false }).setView([30, 15], 3);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution:'© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>',
-    maxZoom:19
-  }).addTo(map);
-  L.control.zoom({ position:'bottomright' }).addTo(map);
-  map.on('click', function(e) {
-    if (!placing) return;
-    pendingLatLng = e.latlng;
-    document.getElementById('modalHint').textContent =
-      `📍 Pinned at ${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`;
-    cancelPlacing(false);
-    openModal();
-  });
-  loadPlaces();
-});</script>
 </body>
 </html>

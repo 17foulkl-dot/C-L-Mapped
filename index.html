@@ -1,156 +1,906 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="utf-8"/>
-<title>Mapped C&L</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mapped C&L</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    :root {
+      --bg: #f6f1e8;
+      --paper: rgba(255,255,255,0.74);
+      --paper-strong: rgba(255,255,255,0.92);
+      --ink: #201c18;
+      --muted: #7d736a;
+      --line: rgba(71, 54, 39, 0.12);
+      --accent: #b8794f;
+      --olive: #6f8261;
+      --sea: #6b8ca8;
+      --gold: #d0a94a;
+      --berry: #8f6c7a;
+      --shadow: 0 18px 50px rgba(28,22,18,0.10);
+      --radius: 22px;
+    }
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      font-family: 'Inter', sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 15% 15%, rgba(184,121,79,0.10), transparent 22%),
+        radial-gradient(circle at 85% 20%, rgba(107,140,168,0.10), transparent 22%),
+        radial-gradient(circle at 75% 80%, rgba(208,169,74,0.08), transparent 18%),
+        var(--bg);
+      overflow: hidden;
+    }
 
-<style>
-body { margin:0; font-family:sans-serif; }
-#map { position:absolute; top:60px; bottom:0; left:250px; right:0; }
-.sidebar { position:absolute; top:60px; left:0; bottom:0; width:250px; overflow:auto; background:#f5f5f5; padding:10px; }
-.place { padding:8px; border-bottom:1px solid #ddd; cursor:pointer; }
-</style>
+    header {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 78px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      backdrop-filter: blur(18px);
+      background: rgba(246,241,232,0.66);
+      border-bottom: 1px solid var(--line);
+      z-index: 1100;
+    }
+
+    .brand { display: flex; flex-direction: column; gap: 3px; }
+    .brand-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 2rem;
+      line-height: 0.95;
+      letter-spacing: 0.03em;
+      font-weight: 700;
+    }
+    .brand-title span { color: var(--accent); }
+    .brand-sub {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.22em;
+      color: var(--muted);
+    }
+
+    .header-right { display: flex; align-items: center; gap: 12px; }
+
+    .save-status {
+      display: flex; align-items: center; gap: 7px;
+      color: var(--muted); font-size: 0.78rem;
+      opacity: 0; transition: opacity 0.22s ease;
+    }
+    .save-status.show { opacity: 1; }
+    .save-dot {
+      width: 8px; height: 8px; border-radius: 999px; background: var(--muted);
+    }
+    .save-dot.saving { background: var(--gold); animation: pulse 1.1s infinite; }
+    .save-dot.saved { background: var(--olive); }
+    .save-dot.error { background: #bb6658; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+    .btn {
+      border: 1px solid var(--line);
+      background: var(--paper-strong);
+      color: var(--ink);
+      border-radius: 999px;
+      padding: 11px 16px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.84rem;
+      font-weight: 600;
+      transition: transform .18s ease, border-color .18s ease, background .18s ease;
+    }
+    .btn:hover { transform: translateY(-1px); border-color: rgba(184,121,79,0.35); }
+    .btn.primary { background: var(--accent); color: #fff; border-color: transparent; }
+    .btn.primary:hover { background: #aa6c43; }
+
+    .sidebar {
+      position: fixed;
+      top: 78px; left: 0; bottom: 0;
+      width: 360px;
+      padding: 18px;
+      border-right: 1px solid var(--line);
+      background: rgba(251,248,242,0.72);
+      backdrop-filter: blur(18px);
+      z-index: 700;
+      display: flex; flex-direction: column;
+      gap: 14px;
+    }
+
+    .hero-card, .search-card, .list-shell, .legend {
+      background: var(--paper);
+      border: 1px solid rgba(255,255,255,0.65);
+      box-shadow: var(--shadow);
+      border-radius: var(--radius);
+      backdrop-filter: blur(14px);
+    }
+
+    .hero-card {
+      padding: 18px 18px 16px;
+      background: linear-gradient(145deg, rgba(255,255,255,0.82), rgba(248,239,229,0.68));
+    }
+    .hero-kicker {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: var(--muted);
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    .hero-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.9rem;
+      line-height: 0.98;
+      margin-bottom: 8px;
+    }
+    .hero-copy { color: var(--muted); font-size: 0.83rem; line-height: 1.45; }
+
+    .search-card { padding: 14px; }
+    .search-wrap { position: relative; margin-bottom: 12px; }
+    .search-wrap span {
+      position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+      color: var(--muted); font-size: 0.9rem;
+    }
+    .search-input {
+      width: 100%; border: 1px solid var(--line); background: rgba(255,255,255,0.85);
+      border-radius: 14px; padding: 12px 12px 12px 36px; outline: none;
+      font-family: inherit; font-size: 0.85rem; color: var(--ink);
+    }
+    .search-input:focus { border-color: rgba(184,121,79,0.45); }
+
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip {
+      border: 1px solid var(--line); background: rgba(255,255,255,0.84); color: var(--muted);
+      border-radius: 999px; padding: 7px 12px; font-size: 0.76rem; cursor: pointer;
+      font-family: inherit; transition: .18s ease;
+    }
+    .chip.active { color: #fff; border-color: transparent; }
+    .chip.active.all { background: var(--ink); }
+    .chip.active.restaurant { background: var(--accent); }
+    .chip.active.travel { background: var(--sea); }
+    .chip.active.activity { background: var(--olive); }
+    .chip.active.gem { background: var(--gold); color: var(--ink); }
+    .chip.active.friends { background: var(--berry); }
+
+    .list-shell {
+      flex: 1; padding: 10px; overflow: auto;
+    }
+    .list-shell::-webkit-scrollbar { width: 6px; }
+    .list-shell::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 999px; }
+
+    .section-head {
+      font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.18em;
+      color: var(--muted); padding: 12px 10px 8px; font-weight: 600;
+    }
+    .place-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px; border-radius: 18px; cursor: pointer;
+      transition: .18s ease; border: 1px solid transparent; margin-bottom: 8px;
+      background: rgba(255,255,255,0.62);
+    }
+    .place-row:hover { transform: translateY(-1px); border-color: rgba(184,121,79,0.18); }
+    .place-row.active { border-color: rgba(184,121,79,0.38); background: rgba(255,255,255,0.88); }
+    .row-dot { width: 10px; height: 10px; border-radius: 999px; flex-shrink: 0; }
+    .row-dot.restaurant { background: var(--accent); }
+    .row-dot.travel { background: var(--sea); }
+    .row-dot.activity { background: var(--olive); }
+    .row-dot.gem { background: var(--gold); }
+    .row-dot.friends { background: var(--berry); }
+    .row-info { flex: 1; min-width: 0; }
+    .row-name {
+      font-family: 'Cormorant Garamond', serif; font-size: 1.15rem;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .row-sub {
+      font-size: 0.76rem; color: var(--muted); margin-top: 3px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .row-stars { color: var(--gold); font-size: 0.72rem; flex-shrink: 0; }
+
+    .empty-msg { padding: 54px 24px; text-align: center; color: var(--muted); }
+    .empty-msg .icon { font-size: 2rem; margin-bottom: 10px; opacity: 0.5; }
+    .empty-msg p { font-size: 0.84rem; line-height: 1.5; }
+
+    #map {
+      position: fixed;
+      top: 78px; left: 360px; right: 0; bottom: 0;
+      z-index: 1;
+    }
+
+    .legend {
+      position: fixed; left: 384px; bottom: 24px; z-index: 450;
+      padding: 14px 16px; min-width: 170px;
+    }
+    .legend-title {
+      font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.18em;
+      color: var(--muted); margin-bottom: 8px; font-weight: 600;
+    }
+    .legend-row { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; color: var(--muted); margin-bottom: 6px; }
+    .leg-dot { width: 8px; height: 8px; border-radius: 999px; }
+
+    .placing-banner {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+      z-index: 1200; background: rgba(32,28,24,0.92); color: #fff; border-radius: 999px;
+      padding: 14px 18px; display: flex; align-items: center; gap: 12px;
+      box-shadow: var(--shadow); transition: transform .22s ease;
+      font-size: 0.88rem;
+    }
+    .placing-banner.show { transform: translateX(-50%) translateY(0); }
+    .cancel-x {
+      width: 24px; height: 24px; border-radius: 999px; border: none;
+      background: rgba(255,255,255,0.12); color: #fff; cursor: pointer;
+    }
+
+    .detail-panel {
+      position: fixed; right: 24px; bottom: 24px; width: 350px; z-index: 1200;
+      background: var(--paper-strong); backdrop-filter: blur(18px); border-radius: 26px;
+      padding: 24px; border: 1px solid rgba(255,255,255,0.75); box-shadow: var(--shadow);
+      transform: translateY(18px); opacity: 0; pointer-events: none; transition: .22s ease;
+    }
+    .detail-panel.show { transform: translateY(0); opacity: 1; pointer-events: auto; }
+    .dp-close { position: absolute; top: 14px; right: 16px; border: none; background: none; color: var(--muted); font-size: 1rem; cursor: pointer; }
+    .dp-tag {
+      font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.18em; font-weight: 700; margin-bottom: 8px;
+    }
+    .dp-tag.restaurant { color: var(--accent); }
+    .dp-tag.travel { color: var(--sea); }
+    .dp-tag.activity { color: var(--olive); }
+    .dp-tag.gem { color: #9f7e1d; }
+    .dp-tag.friends { color: var(--berry); }
+    .dp-name {
+      font-family: 'Cormorant Garamond', serif; font-size: 2.15rem; line-height: 0.95; margin-bottom: 8px;
+    }
+    .dp-address { color: var(--muted); font-size: 0.8rem; line-height: 1.45; margin-bottom: 12px; }
+    .dp-stars { color: var(--gold); letter-spacing: 2px; margin-bottom: 14px; }
+    .dp-note {
+      font-size: 0.86rem; line-height: 1.55; color: #5f554c; font-style: italic;
+      border-left: 2px solid rgba(184,121,79,0.3); padding-left: 12px; margin-bottom: 14px;
+    }
+    .dp-who { color: var(--muted); font-size: 0.76rem; margin-bottom: 16px; }
+    .dp-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .dp-link, .dp-edit, .dp-delete {
+      border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,0.88);
+      padding: 10px 14px; font-family: inherit; font-size: 0.78rem; text-decoration: none; cursor: pointer;
+      transition: .18s ease;
+    }
+    .dp-link { color: var(--sea); }
+    .dp-edit { color: var(--accent); }
+    .dp-delete { color: #bb6658; }
+    .dp-link:hover, .dp-edit:hover, .dp-delete:hover { transform: translateY(-1px); }
+
+    .overlay {
+      position: fixed; inset: 0; background: rgba(32,28,24,0.28); backdrop-filter: blur(8px);
+      z-index: 2000; display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none; transition: .2s ease; padding: 24px;
+    }
+    .overlay.open { opacity: 1; pointer-events: auto; }
+    .modal {
+      width: 560px; max-width: 100%; max-height: 90vh; overflow: auto;
+      background: rgba(252,249,244,0.95); border-radius: 28px; box-shadow: var(--shadow);
+      border: 1px solid rgba(255,255,255,0.78); padding: 28px; transform: scale(.97); transition: .2s ease;
+    }
+    .overlay.open .modal { transform: scale(1); }
+    .modal h2 {
+      font-family: 'Cormorant Garamond', serif; font-size: 2rem; line-height: 0.95; margin-bottom: 6px;
+    }
+    .modal-sub { color: var(--muted); font-size: 0.84rem; line-height: 1.45; margin-bottom: 20px; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .full-span { grid-column: 1 / -1; }
+    label {
+      display: block; margin-bottom: 7px; font-size: 0.68rem; text-transform: uppercase;
+      letter-spacing: 0.18em; color: var(--muted); font-weight: 700;
+    }
+    input[type="text"], textarea {
+      width: 100%; border: 1px solid var(--line); background: rgba(255,255,255,0.85);
+      border-radius: 16px; padding: 12px 14px; outline: none; font-family: inherit; color: var(--ink);
+    }
+    textarea { min-height: 96px; resize: vertical; }
+    input[type="text"]:focus, textarea:focus { border-color: rgba(184,121,79,0.45); }
+
+    .type-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .type-card {
+      border: 1px solid var(--line); background: rgba(255,255,255,0.86); border-radius: 18px;
+      padding: 14px 12px; cursor: pointer; color: var(--muted); text-align: left; font-family: inherit;
+      transition: .18s ease;
+    }
+    .type-card.sel.restaurant { border-color: rgba(184,121,79,0.4); color: var(--accent); background: rgba(184,121,79,0.08); }
+    .type-card.sel.travel { border-color: rgba(107,140,168,0.4); color: var(--sea); background: rgba(107,140,168,0.08); }
+    .type-card.sel.activity { border-color: rgba(111,130,97,0.4); color: var(--olive); background: rgba(111,130,97,0.08); }
+    .type-card.sel.gem { border-color: rgba(208,169,74,0.4); color: #9f7e1d; background: rgba(208,169,74,0.10); }
+
+    .star-row { display: flex; gap: 6px; }
+    .star-b { border: none; background: none; font-size: 1.7rem; color: #d3c8bc; cursor: pointer; }
+    .star-b.on { color: var(--gold); }
+
+    .who-row { display: flex; gap: 10px; }
+    .who-card {
+      flex: 1; border: 1px solid var(--line); background: rgba(255,255,255,0.86);
+      border-radius: 16px; padding: 13px; cursor: pointer; color: var(--muted); font-family: inherit;
+    }
+    .who-card.sel { border-color: rgba(184,121,79,0.4); color: var(--accent); background: rgba(184,121,79,0.08); }
+
+    .modal-foot { display: flex; gap: 10px; margin-top: 18px; }
+    .modal-foot .btn { flex: 1; }
+
+    .invite-code {
+      text-align: center; font-family: 'Cormorant Garamond', serif; font-size: 2rem;
+      letter-spacing: 0.18em; color: var(--accent); background: rgba(255,255,255,0.86);
+      border: 1px dashed rgba(184,121,79,0.35); border-radius: 22px; padding: 20px; margin: 14px 0 16px;
+    }
+
+    .lc-pin { display: flex; flex-direction: column; align-items: center; }
+    .lc-pin-head {
+      width: 30px; height: 30px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+      display: flex; align-items: center; justify-content: center; border: 2px solid rgba(255,255,255,0.72);
+      box-shadow: 0 8px 18px rgba(31,26,23,0.25);
+    }
+    .lc-pin-icon { transform: rotate(45deg); font-size: 12px; }
+    .lc-pin-tail { width: 2px; height: 8px; background: rgba(31,26,23,0.18); margin-top: 1px; }
+    .leaflet-container.placing { cursor: crosshair !important; }
+
+    @media (max-width: 860px) {
+      .sidebar { width: 100%; max-width: 360px; }
+      #map { left: 360px; }
+      .legend { left: 384px; }
+    }
+
+    @media (max-width: 720px) {
+      header { padding: 0 14px; }
+      .brand-title { font-size: 1.6rem; }
+      .sidebar {
+        top: auto; width: 100%; left: 0; right: 0; bottom: 0; height: 46%;
+        border-right: none; border-top: 1px solid var(--line);
+      }
+      #map { left: 0; top: 78px; bottom: 46%; }
+      .legend { left: 16px; bottom: calc(46% + 16px); }
+      .detail-panel { left: 16px; right: 16px; width: auto; }
+      .hero-title { font-size: 1.55rem; }
+    }
+  </style>
 </head>
-
 <body>
+  <header>
+    <div class="brand">
+      <div class="brand-title">Mapped <span>C&L</span></div>
+      <div class="brand-sub">Places we keep</div>
+    </div>
 
-<div style="height:60px;background:#333;color:white;padding:15px;">
-Mapped C&L
-<button onclick="startPlacing()">Add Pin</button>
-</div>
+    <div class="header-right">
+      <div class="save-status" id="saveStatus">
+        <div class="save-dot" id="saveDot"></div>
+        <span id="saveText">Saved</span>
+      </div>
+      <button class="btn" onclick="openInvite()">Invite</button>
+      <button class="btn primary" onclick="startPlacing()">＋ Pin</button>
+    </div>
+  </header>
 
-<div class="sidebar">
-<input id="search" placeholder="Search..." oninput="render()"/>
-<div id="list"></div>
-</div>
+  <aside class="sidebar">
+    <div class="hero-card">
+      <div class="hero-kicker">Travel Journal</div>
+      <div class="hero-title">Keep the good ones.</div>
+      <div class="hero-copy">Small list. Strong memories.</div>
+    </div>
 
-<div id="map"></div>
+    <div class="search-card">
+      <div class="search-wrap">
+        <span>⌕</span>
+        <input id="searchInput" class="search-input" type="text" placeholder="Search" oninput="render()">
+      </div>
+      <div class="chips">
+        <button class="chip all active" onclick="setFilter('all', this)">All</button>
+        <button class="chip restaurant" onclick="setFilter('restaurant', this)">Food</button>
+        <button class="chip travel" onclick="setFilter('travel', this)">Travel</button>
+        <button class="chip activity" onclick="setFilter('activity', this)">Activity</button>
+        <button class="chip gem" onclick="setFilter('gem', this)">Gem</button>
+        <button class="chip friends" onclick="setFilter('friends', this)">Friends</button>
+      </div>
+    </div>
 
-<script>
-const STORAGE_KEY = 'mapped_places';
+    <div class="list-shell" id="placesList"></div>
+  </aside>
 
-let places = [];
-let map;
-let placing = false;
-let pendingLatLng = null;
+  <div id="map"></div>
 
-// ================= INIT =================
-window.onload = () => {
-map = L.map('map').setView([30,0],2);
+  <div class="legend">
+    <div class="legend-title">Legend</div>
+    <div class="legend-row"><div class="leg-dot" style="background:var(--accent)"></div>Food</div>
+    <div class="legend-row"><div class="leg-dot" style="background:var(--sea)"></div>Travel</div>
+    <div class="legend-row"><div class="leg-dot" style="background:var(--olive)"></div>Activity</div>
+    <div class="legend-row"><div class="leg-dot" style="background:var(--gold)"></div>Gem</div>
+    <div class="legend-row"><div class="leg-dot" style="background:var(--berry)"></div>Friend</div>
+  </div>
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+  <div class="placing-banner" id="placingBanner">
+    Click map to pin
+    <button class="cancel-x" onclick="cancelPlacing()">✕</button>
+  </div>
 
-map.on('click', e=>{
-if(!placing) return;
-pendingLatLng = e.latlng;
-placing=false;
-openForm();
-});
+  <div class="detail-panel" id="detailPanel">
+    <button class="dp-close" onclick="closeDetail()">✕</button>
+    <div class="dp-tag" id="dpTag"></div>
+    <div class="dp-name" id="dpName"></div>
+    <div class="dp-address" id="dpAddress"></div>
+    <div class="dp-stars" id="dpStars"></div>
+    <div class="dp-note" id="dpNote"></div>
+    <div class="dp-who" id="dpWho"></div>
+    <div class="dp-actions">
+      <a class="dp-link" id="dpPrimaryLink" target="_blank" rel="noopener">Open</a>
+      <button class="dp-edit" onclick="editActive()">Edit</button>
+      <button class="dp-delete" onclick="deleteActive()">Delete</button>
+    </div>
+  </div>
 
-loadPlaces();
-};
+  <div class="overlay" id="addOverlay">
+    <div class="modal">
+      <h2 id="modalTitle">New pin</h2>
+      <p class="modal-sub" id="modalHint">One place. One note.</p>
 
-// ================= STORAGE =================
-function loadPlaces(){
-const raw = localStorage.getItem(STORAGE_KEY);
-places = raw ? JSON.parse(raw) : [];
-render();
-}
+      <div class="form-grid">
+        <div class="full-span">
+          <label>Name</label>
+          <input type="text" id="iName" placeholder="Place name">
+        </div>
 
-function savePlaces(){
-localStorage.setItem(STORAGE_KEY, JSON.stringify(places));
-}
+        <div>
+          <label>Address</label>
+          <input type="text" id="iAddress" placeholder="City, spot, region">
+        </div>
 
-// ================= UI =================
-function render(){
-renderList();
-renderMarkers();
-}
+        <div>
+          <label>Website</label>
+          <input type="text" id="iWebsite" placeholder="restaurant only">
+        </div>
 
-function renderList(){
-const q = document.getElementById("search").value.toLowerCase();
-const list = document.getElementById("list");
-list.innerHTML="";
+        <div class="full-span">
+          <label>Type</label>
+          <div class="type-grid">
+            <button type="button" class="type-card restaurant" onclick="selType('restaurant', this)">🍽 Restaurant</button>
+            <button type="button" class="type-card travel" onclick="selType('travel', this)">✈ Travel</button>
+            <button type="button" class="type-card activity" onclick="selType('activity', this)">🎯 Activity</button>
+            <button type="button" class="type-card gem" onclick="selType('gem', this)">💎 Hidden Gem</button>
+          </div>
+        </div>
 
-places
-.filter(p=>p.name.toLowerCase().includes(q))
-.forEach(p=>{
-const div = document.createElement("div");
-div.className="place";
-div.innerHTML = `<strong>${p.name}</strong><br>${p.address||""}`;
-div.onclick = ()=>showDetail(p.id);
-list.appendChild(div);
-});
-}
+        <div class="full-span">
+          <label>Rating</label>
+          <div class="star-row">
+            <button type="button" class="star-b" onclick="setStars(1)">★</button>
+            <button type="button" class="star-b" onclick="setStars(2)">★</button>
+            <button type="button" class="star-b" onclick="setStars(3)">★</button>
+            <button type="button" class="star-b" onclick="setStars(4)">★</button>
+            <button type="button" class="star-b" onclick="setStars(5)">★</button>
+          </div>
+        </div>
 
-let markers = {};
+        <div class="full-span">
+          <label>Note</label>
+          <textarea id="iNote" placeholder="Why it stays"></textarea>
+        </div>
 
-function renderMarkers(){
-Object.values(markers).forEach(m=>map.removeLayer(m));
-markers={};
+        <div class="full-span">
+          <label>Added by</label>
+          <div class="who-row">
+            <button type="button" class="who-card sel" onclick="selWho('us', this)">💑 Us</button>
+            <button type="button" class="who-card" onclick="selWho('friend', this)">👥 Friend</button>
+          </div>
+        </div>
 
-places.forEach(p=>{
-const m = L.marker([p.lat,p.lng]).addTo(map);
-m.on("click",()=>showDetail(p.id));
-markers[p.id]=m;
-});
-}
+        <div class="full-span" id="friendNameGroup" style="display:none;">
+          <label>Name</label>
+          <input type="text" id="iFriendName" placeholder="Who shared it">
+        </div>
+      </div>
 
-// ================= ADD =================
-function startPlacing(){
-placing=true;
-}
+      <div class="modal-foot">
+        <button class="btn" onclick="closeModal()">Cancel</button>
+        <button class="btn primary" onclick="submitPin()">Save</button>
+      </div>
+    </div>
+  </div>
 
-function openForm(edit=null){
-const name = prompt("Name:");
-if(!name) return;
+  <div class="overlay" id="inviteOverlay">
+    <div class="modal" style="max-width:430px;">
+      <h2>Invite</h2>
+      <p class="modal-sub">Share the code.</p>
+      <div class="invite-code">LC-7842</div>
+      <div class="modal-foot">
+        <button class="btn primary" onclick="closeInvite()">Close</button>
+      </div>
+    </div>
+  </div>
 
-const address = prompt("Address:");
-const website = prompt("Website:");
-const note = prompt("Note:");
+  <script>
+    const STORAGE_KEY = 'mapped_cl_places_v2';
 
-if(edit){
-edit.name=name;
-edit.address=address;
-edit.website=website;
-edit.note=note;
-}else{
-places.push({
-id:Date.now(),
-name,address,website,note,
-lat:pendingLatLng.lat,
-lng:pendingLatLng.lng
-});
-}
+    const TYPE_COLORS = {
+      restaurant: '#b8794f',
+      travel: '#6b8ca8',
+      activity: '#6f8261',
+      gem: '#d0a94a',
+      friends: '#8f6c7a'
+    };
 
-savePlaces();
-render();
-}
+    const TYPE_ICONS = {
+      restaurant: '🍽',
+      travel: '✈',
+      activity: '🎯',
+      gem: '💎',
+      friends: '📍'
+    };
 
-// ================= DETAIL =================
-function showDetail(id){
-const p = places.find(x=>x.id===id);
+    const TYPE_LABELS = {
+      restaurant: 'Restaurant',
+      travel: 'Travel',
+      activity: 'Activity',
+      gem: 'Hidden Gem',
+      friends: 'Friend Pick'
+    };
 
-const link = p.website
-? `Website: ${p.website}`
-: `Maps: https://maps.google.com?q=${p.lat},${p.lng}`;
+    let places = [];
+    let currentFilter = 'all';
+    let placing = false;
+    let pendingLatLng = null;
+    let selType_ = null;
+    let selStars = 0;
+    let selWho_ = 'us';
+    let activeId = null;
+    let editingId = null;
+    let markers = {};
+    let map;
 
-const action = confirm(`${p.name}\n\n${p.note||""}\n\n${link}\n\nOK=Edit, Cancel=Delete`);
+    function showSaveStatus(state, text) {
+      const s = document.getElementById('saveStatus');
+      const d = document.getElementById('saveDot');
+      const t = document.getElementById('saveText');
+      d.className = 'save-dot ' + state;
+      t.textContent = text;
+      s.classList.add('show');
+      if (state === 'saved' || state === 'error') {
+        setTimeout(() => s.classList.remove('show'), 1800);
+      }
+    }
 
-if(action){
-openForm(p);
-}else{
-if(confirm("Delete?")){
-places = places.filter(x=>x.id!==id);
-savePlaces();
-render();
-}
-}
-}
-</script>
+    function savePlaces() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(places));
+        showSaveStatus('saved', 'Saved');
+      } catch (e) {
+        console.error('Save failed:', e);
+        showSaveStatus('error', 'Save failed');
+        alert('Save failed in this browser.');
+      }
+    }
 
+    function loadPlaces() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        places = raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        console.error('Load failed:', e);
+        places = [];
+      }
+      render();
+    }
+
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function normalizeUrl(url) {
+      const v = (url || '').trim();
+      if (!v) return '';
+      if (/^https?:\/\//i.test(v)) return v;
+      return 'https://' + v;
+    }
+
+    function makeIcon(type, who) {
+      const cls = who === 'friend' ? 'friends' : type;
+      const color = TYPE_COLORS[cls] || TYPE_COLORS.gem;
+      const icon = TYPE_ICONS[cls] || '📍';
+      const html = `
+        <div class="lc-pin">
+          <div class="lc-pin-head" style="background:${color}">
+            <span class="lc-pin-icon">${icon}</span>
+          </div>
+          <div class="lc-pin-tail"></div>
+        </div>`;
+      return L.divIcon({ html, className: '', iconSize: [30, 42], iconAnchor: [15, 42] });
+    }
+
+    function refreshMarkers() {
+      Object.values(markers).forEach(m => map.removeLayer(m));
+      markers = {};
+      getFiltered().forEach(p => {
+        const m = L.marker([p.lat, p.lng], { icon: makeIcon(p.type, p.who) }).addTo(map);
+        m.on('click', () => showDetail(p.id));
+        markers[p.id] = m;
+      });
+    }
+
+    function getFiltered() {
+      let result = places.slice();
+      if (currentFilter === 'friends') {
+        result = result.filter(p => p.who === 'friend');
+      } else if (currentFilter !== 'all') {
+        result = result.filter(p => p.type === currentFilter);
+      }
+
+      const q = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
+      if (q) {
+        result = result.filter(p =>
+          (p.name || '').toLowerCase().includes(q) ||
+          (p.address || '').toLowerCase().includes(q) ||
+          (p.note || '').toLowerCase().includes(q) ||
+          (p.added || '').toLowerCase().includes(q)
+        );
+      }
+      return result;
+    }
+
+    function renderSidebar() {
+      const list = document.getElementById('placesList');
+      const filtered = getFiltered();
+
+      if (!filtered.length) {
+        list.innerHTML = `<div class="empty-msg"><div class="icon">✦</div><p>No places yet.</p></div>`;
+        return;
+      }
+
+      const ours = filtered.filter(p => p.who === 'us');
+      const friends = filtered.filter(p => p.who === 'friend');
+
+      const row = p => {
+        const cls = p.who === 'friend' ? 'friends' : p.type;
+        return `
+          <div class="place-row ${activeId === p.id ? 'active' : ''}" onclick="showDetail('${p.id}')">
+            <div class="row-dot ${cls}"></div>
+            <div class="row-info">
+              <div class="row-name">${escapeHtml(p.name)}</div>
+              <div class="row-sub">${escapeHtml(p.address || '')}</div>
+            </div>
+            <div class="row-stars">${'★'.repeat(p.rating || 0)}</div>
+          </div>`;
+      };
+
+      let html = '';
+      if (ours.length) html += `<div class="section-head">Us</div>${ours.map(row).join('')}`;
+      if (friends.length) html += `<div class="section-head">Friends</div>${friends.map(row).join('')}`;
+      list.innerHTML = html;
+    }
+
+    function render() {
+      renderSidebar();
+      if (map) refreshMarkers();
+    }
+
+    function setFilter(f, el) {
+      currentFilter = f;
+      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      render();
+    }
+
+    function showDetail(id) {
+      activeId = id;
+      const p = places.find(x => String(x.id) === String(id));
+      if (!p) return;
+      const cls = p.who === 'friend' ? 'friends' : p.type;
+      const tagText = p.who === 'friend' ? 'Friend Pick' : (TYPE_LABELS[p.type] || 'Place');
+
+      const tag = document.getElementById('dpTag');
+      tag.className = `dp-tag ${cls}`;
+      tag.textContent = tagText;
+      document.getElementById('dpName').textContent = p.name || '';
+      document.getElementById('dpAddress').textContent = p.address || 'No address';
+      document.getElementById('dpStars').textContent = '★'.repeat(p.rating || 0) + '☆'.repeat(5 - (p.rating || 0));
+      document.getElementById('dpNote').textContent = p.note || 'No note.';
+      document.getElementById('dpWho').textContent = p.who === 'friend' ? `From ${p.added || 'Friend'}` : 'Saved by us';
+
+      const link = document.getElementById('dpPrimaryLink');
+      if (p.type === 'restaurant' && p.website) {
+        link.href = normalizeUrl(p.website);
+        link.textContent = 'Website';
+      } else {
+        const q = encodeURIComponent(p.address || `${p.lat},${p.lng}`);
+        link.href = `https://www.google.com/maps/search/?api=1&query=${q}`;
+        link.textContent = 'Map';
+      }
+
+      document.getElementById('detailPanel').classList.add('show');
+      map.flyTo([p.lat, p.lng], Math.max(map.getZoom(), 8), { duration: 1 });
+      renderSidebar();
+    }
+
+    function closeDetail() {
+      activeId = null;
+      document.getElementById('detailPanel').classList.remove('show');
+      renderSidebar();
+    }
+
+    function startPlacing() {
+      editingId = null;
+      placing = true;
+      pendingLatLng = null;
+      document.getElementById('placingBanner').classList.add('show');
+      document.getElementById('map').classList.add('placing');
+      closeDetail();
+    }
+
+    function cancelPlacing(resetFlag = true) {
+      if (resetFlag) {
+        placing = false;
+        pendingLatLng = null;
+      }
+      document.getElementById('placingBanner').classList.remove('show');
+      document.getElementById('map').classList.remove('placing');
+    }
+
+    function resetModalState() {
+      selType_ = null;
+      selStars = 0;
+      selWho_ = 'us';
+      editingId = null;
+      ['iName','iAddress','iWebsite','iNote','iFriendName'].forEach(id => document.getElementById(id).value = '');
+      document.querySelectorAll('.type-card').forEach(b => b.classList.remove('sel'));
+      document.querySelectorAll('.star-b').forEach(b => b.classList.remove('on'));
+      document.querySelectorAll('.who-card').forEach(b => b.classList.remove('sel'));
+      document.querySelector('.who-card').classList.add('sel');
+      document.getElementById('friendNameGroup').style.display = 'none';
+      document.getElementById('modalTitle').textContent = 'New pin';
+      document.getElementById('modalHint').textContent = 'One place. One note.';
+    }
+
+    function openModal() {
+      document.getElementById('addOverlay').classList.add('open');
+    }
+
+    function closeModal() {
+      document.getElementById('addOverlay').classList.remove('open');
+      placing = false;
+      pendingLatLng = null;
+    }
+
+    function selType(t, el) {
+      selType_ = t;
+      document.querySelectorAll('.type-card').forEach(b => b.classList.remove('sel'));
+      el.classList.add('sel');
+    }
+
+    function setStars(n) {
+      selStars = n;
+      document.querySelectorAll('.star-b').forEach((b, i) => b.classList.toggle('on', i < n));
+    }
+
+    function selWho(w, el) {
+      selWho_ = w;
+      document.querySelectorAll('.who-card').forEach(b => b.classList.remove('sel'));
+      el.classList.add('sel');
+      document.getElementById('friendNameGroup').style.display = w === 'friend' ? 'block' : 'none';
+    }
+
+    function editActive() {
+      const p = places.find(x => String(x.id) === String(activeId));
+      if (!p) return;
+
+      editingId = p.id;
+      pendingLatLng = { lat: p.lat, lng: p.lng };
+      resetModalState();
+      editingId = p.id;
+      pendingLatLng = { lat: p.lat, lng: p.lng };
+      selType_ = p.type;
+      selStars = p.rating || 0;
+      selWho_ = p.who || 'us';
+
+      document.getElementById('modalTitle').textContent = 'Edit pin';
+      document.getElementById('modalHint').textContent = 'Tighten it up.';
+      document.getElementById('iName').value = p.name || '';
+      document.getElementById('iAddress').value = p.address || '';
+      document.getElementById('iWebsite').value = p.website || '';
+      document.getElementById('iNote').value = p.note || '';
+      document.getElementById('iFriendName').value = p.who === 'friend' ? (p.added || '') : '';
+      document.getElementById('friendNameGroup').style.display = p.who === 'friend' ? 'block' : 'none';
+
+      document.querySelectorAll('.type-card').forEach(card => {
+        card.classList.toggle('sel', card.classList.contains(p.type));
+      });
+      document.querySelectorAll('.star-b').forEach((b, i) => b.classList.toggle('on', i < selStars));
+      document.querySelectorAll('.who-card').forEach((b, i) => b.classList.toggle('sel', (p.who === 'us' && i === 0) || (p.who === 'friend' && i === 1)));
+
+      openModal();
+    }
+
+    function deleteActive() {
+      if (!activeId) return;
+      if (!confirm('Delete this pin?')) return;
+      places = places.filter(p => String(p.id) !== String(activeId));
+      savePlaces();
+      closeDetail();
+      render();
+    }
+
+    function submitPin() {
+      const name = document.getElementById('iName').value.trim();
+      const address = document.getElementById('iAddress').value.trim();
+      const website = document.getElementById('iWebsite').value.trim();
+      const note = document.getElementById('iNote').value.trim();
+      const friend = document.getElementById('iFriendName').value.trim();
+
+      if (!name || !selType_ || !selStars || !pendingLatLng) {
+        alert('Add name, type, rating, and a map click.');
+        return;
+      }
+
+      const payload = {
+        id: editingId || Date.now(),
+        name,
+        address,
+        website,
+        note,
+        type: selType_,
+        rating: selStars,
+        who: selWho_,
+        added: selWho_ === 'friend' ? (friend || 'Friend') : 'Us',
+        lat: pendingLatLng.lat,
+        lng: pendingLatLng.lng
+      };
+
+      if (editingId) {
+        places = places.map(p => String(p.id) === String(editingId) ? payload : p);
+      } else {
+        places.unshift(payload);
+      }
+
+      savePlaces();
+      closeModal();
+      render();
+      setTimeout(() => showDetail(payload.id), 100);
+    }
+
+    function openInvite() {
+      document.getElementById('inviteOverlay').classList.add('open');
+    }
+    function closeInvite() {
+      document.getElementById('inviteOverlay').classList.remove('open');
+    }
+
+    document.getElementById('addOverlay').addEventListener('click', e => {
+      if (e.target === e.currentTarget) closeModal();
+    });
+    document.getElementById('inviteOverlay').addEventListener('click', e => {
+      if (e.target === e.currentTarget) closeInvite();
+    });
+
+    window.addEventListener('load', () => {
+      map = L.map('map', { zoomControl: false }).setView([30, 12], 3);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap',
+        maxZoom: 19
+      }).addTo(map);
+      L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+      map.on('click', e => {
+        if (!placing) return;
+        pendingLatLng = e.latlng;
+        document.getElementById('modalHint').textContent = `Pinned at ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
+        cancelPlacing(false);
+        resetModalState();
+        openModal();
+      });
+
+      loadPlaces();
+    });
+  </script>
 </body>
 </html>

@@ -219,12 +219,6 @@ import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gsta
 import { getDatabase, ref, onValue, push, set, update, remove, get } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js';
 
 // ================= FIREBASE CONFIG =================
-// Replace this whole object with your Firebase web app config from the console.
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
 // Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyAZMLaqKIcTf8kpMNfwUh_8F9XEpYxWvjo",
@@ -587,30 +581,98 @@ function subscribeToPlaces() {
 }
 
 async function bootFirebase() {
-  try {
-    updateInviteDisplays();
-    app = initializeApp(firebaseConfig);
-    auth = getAuth(app);
-    db = getDatabase(app);
-    updateAuthBadge('Signing in…');
-    await signInAnonymously(auth);
-    onAuthStateChanged(auth, async (user) => {
-      if (!user) return;
-      authedUid = user.uid;
-      updateAuthBadge('Connected');
-      showSyncStatus('saved', 'Connected');
-      await migrateLocalPinsIfNeeded();
-      subscribeToPlaces();
-    });
-  } catch (e) {
-    console.error(e);
-    hideLanding();
-    updateAuthBadge('Setup needed');
-    showSyncStatus('error', 'Firebase setup incomplete');
-    alert('Firebase is not configured yet. Paste your Firebase web config and enable Realtime Database + Anonymous Auth.');
-  }
-}
 
+
+
+  try {
+
+
+
+    console.log("Starting Firebase...");
+
+
+
+    // 🔥 THIS IS CRITICAL
+
+
+
+    await signInAnonymously(auth);
+
+
+
+    console.log("Signed in");
+
+
+
+    const placesRef = ref(db, `maps/LC-7842/places`);
+
+
+
+    onValue(placesRef, (snapshot) => {
+
+
+
+      const data = snapshot.val() || {};
+
+
+
+      places = Object.entries(data).map(([id, v]) => ({ id, ...v }));
+
+
+
+      console.log("Loaded places:", places.length);
+
+
+
+      hideLanding();   // 👈 THIS MUST RUN
+
+
+
+      render();
+
+
+
+    }, (error) => {
+
+
+
+      console.error("Listener error:", error);
+
+
+
+      hideLanding();
+
+
+
+      alert(error.message);
+
+
+
+    });
+
+
+
+  } catch (e) {
+
+
+
+    console.error("BOOT ERROR:", e);
+
+
+
+    hideLanding();
+
+
+
+    alert(e.message);
+
+
+
+  }
+
+
+
+}
 window.exportPlaces = function() {
   const blob = new Blob([JSON.stringify(places, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);

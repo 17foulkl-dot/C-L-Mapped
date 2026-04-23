@@ -254,7 +254,6 @@ let activeId = null;
 let editingId = null;
 let markers = {};
 let map;
-let app, auth, db;
 let authedUid = null;
 let hasRealtimeSubscription = false;
 
@@ -581,98 +580,52 @@ function subscribeToPlaces() {
 }
 
 async function bootFirebase() {
-
-
-
-  try {
-
-
-
-    console.log("Starting Firebase...");
-
-
-
-    // 🔥 THIS IS CRITICAL
-
-
-
-    await signInAnonymously(auth);
-
-
-
-    console.log("Signed in");
-
-
-
-    const placesRef = ref(db, `maps/LC-7842/places`);
-
-
-
-    onValue(placesRef, (snapshot) => {
-
-
-
-      const data = snapshot.val() || {};
-
-
-
-      places = Object.entries(data).map(([id, v]) => ({ id, ...v }));
-
-
-
-      console.log("Loaded places:", places.length);
-
-
-
-      hideLanding();   // 👈 THIS MUST RUN
-
-
-
-      render();
-
-
-
-    }, (error) => {
-
-
-
-      console.error("Listener error:", error);
-
-
-
-      hideLanding();
-
-
-
-      alert(error.message);
-
-
-
-    });
-
-
-
-  } catch (e) {
-
-
-
-    console.error("BOOT ERROR:", e);
-
-
-
-    hideLanding();
-
-
-
-    alert(e.message);
-
-
-
-  }
-
-
-
+try {
+console.log('Starting Firebase...');
+updateAuthBadge('Signing in…');
+showSyncStatus('saving', 'Connecting…');
+
+const cred = await signInAnonymously(auth);
+authedUid = cred.user.uid;
+
+updateAuthBadge('Connected');
+console.log('Signed in:', authedUid);
+
+await migrateLocalPinsIfNeeded();
+subscribeToPlaces();
+
+} catch (e) {
+console.error('BOOT ERROR:', e);
+hideLanding();
+updateAuthBadge('Connection failed');
+showSyncStatus('error', 'Connection failed');
+alert(e.message);
 }
+}
+
+
+
+
+
+
+
+
+   
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
 window.exportPlaces = function() {
   const blob = new Blob([JSON.stringify(places, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);

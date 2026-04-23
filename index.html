@@ -238,6 +238,8 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getDatabase(app);
 
 // Keep this the same for your family unless you want a different shared code.
 const MAP_CODE = 'LC-7842';
